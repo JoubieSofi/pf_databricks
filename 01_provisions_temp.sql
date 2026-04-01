@@ -220,12 +220,27 @@ provisions AS (
     -- Deployment link: not null means this provision is tracked in SFDC Pathfinder
     pf.salesforce_pathfinder_deployment_service_now_cloud_instance_id_c        AS sfdc_pf_deployment_id,
     pf.salesforce_pathfinder_deployment_id                                     AS sfdc_pathfinder_deployment_id,
-    pf.salesforce_pathfinder_deployment_product_code_c                         AS sfdc_deployment_product_code
+    pf.salesforce_pathfinder_deployment_product_code_c                         AS sfdc_deployment_product_code,
+    d.u_resource_key                                                            AS decom_resource
   FROM provi p
   LEFT JOIN prod_dm.alteryx.alteryx_master_account m
     ON p.sn_acct_id = m.servicenow_customer_account_sys_id
   LEFT JOIN prod_dm.alteryx.alteryx_salesforce_pathfinder_deployment_c pf
     ON pf.salesforce_pathfinder_deployment_service_now_cloud_instance_id_c = p.provision_sys_id
+  LEFT JOIN (
+    SELECT DISTINCT
+      CASE WHEN CHARINDEX('.', AppHostname)  > 0
+           THEN LEFT(AppHostname,  CHARINDEX('.', AppHostname)  - 1)
+      END AS app_resource_key,
+      CASE WHEN CHARINDEX('.', SiteHostname) > 0
+           THEN LEFT(SiteHostname, CHARINDEX('.', SiteHostname) - 1)
+      END AS site_resource_key,
+      COALESCE(
+        CASE WHEN CHARINDEX('.', AppHostname)  > 0 THEN LEFT(AppHostname,  CHARINDEX('.', AppHostname)  - 1) END,
+        CASE WHEN CHARINDEX('.', SiteHostname) > 0 THEN LEFT(SiteHostname, CHARINDEX('.', SiteHostname) - 1) END
+      ) AS u_resource_key
+    FROM dev_dm.revops_analytics.builder_decom_stg
+  ) d ON d.u_resource_key = p.u_resource_key
 ),
 
 -- ── Lookup: sn_sys_class_name ↔ product_family (from sys_class_name_mapping) ──
@@ -270,6 +285,7 @@ match_1a AS (
     p.sfdc_pf_deployment_id,
     p.sfdc_pathfinder_deployment_id,
     p.sfdc_deployment_product_code,
+    p.decom_resource,
     p.sn_pathfinder_enabled,
     p.sn_used_for,
     p.sn_install_status,
@@ -313,6 +329,7 @@ match_1b AS (
     p.sfdc_pf_deployment_id,
     p.sfdc_pathfinder_deployment_id,
     p.sfdc_deployment_product_code,
+    p.decom_resource,
     p.sn_pathfinder_enabled,
     p.sn_used_for,
     p.sn_install_status,
@@ -359,6 +376,7 @@ match_2 AS (
     p.sfdc_pf_deployment_id,
     p.sfdc_pathfinder_deployment_id,
     p.sfdc_deployment_product_code,
+    p.decom_resource,
     p.sn_pathfinder_enabled,
     p.sn_used_for,
     p.sn_install_status,
@@ -404,6 +422,7 @@ no_match AS (
     NULL  AS sfdc_pf_deployment_id,
     NULL  AS sfdc_pathfinder_deployment_id,
     NULL  AS sfdc_deployment_product_code,
+    NULL  AS decom_resource,
     NULL  AS sn_pathfinder_enabled,
     NULL  AS sn_used_for,
     NULL  AS sn_install_status,
