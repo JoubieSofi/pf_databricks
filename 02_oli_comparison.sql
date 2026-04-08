@@ -2,8 +2,8 @@
 -- 02_oli_comparison.sql  (Databricks)
 --
 -- Compares unique OLI counts between two provisions_temp snapshots:
---   A (old) → dev_dm.revops_analytics.provisions_temp4726
---   B (new) → dev_dm.revops_analytics.provisions_temp
+--   A (old) → dev_dm.revops_analytics.provisions_temp
+--   B (new) → dev_dm.revops_analytics.provisions_temp4726
 --
 -- Segments:
 --   old_only  — in A but not B  (OLIs dropped by new run)
@@ -22,12 +22,12 @@ WITH
 
 old_olis AS (
   SELECT DISTINCT oli_id, product_family
-  FROM dev_dm.revops_analytics.provisions_temp4726
+  FROM dev_dm.revops_analytics.provisions_temp
 ),
 
 new_olis AS (
   SELECT DISTINCT oli_id, product_family
-  FROM dev_dm.revops_analytics.provisions_temp
+  FROM dev_dm.revops_analytics.provisions_temp4726
 ),
 
 -- OLIs that appear in only one dataset, with product_family sourced from
