@@ -10,18 +10,18 @@
 -- all candidate provision rows for that OLI).
 --
 -- Column definitions:
---   pf_provisioned_oli      — oli_id when (sn_pathfinder_enabled + active) OR
---                             match_type contains 'deployment'
---   pf_provisioned_override — extends pf_provisioned_oli to also include
---                             Identity Security Insights (all dates) and
---                             Entitle Platform OLIs closed after 2025-01-01
---   oli_output              — final 3-way category label
---   is_pf_or_decom          — 1 when oli_output is 'Decom/RR' or 'PF Provisioned'
+--   OLI_ID         — the OLI identifier
+--   Decom_RR       — 1 when the OLI is a reversal or decommissioned, NULL otherwise
+--   PF_Provisioned — 1 when the OLI has a confirmed PF provision, NULL otherwise
+--
+-- Only rows classified as 'Decom/RR' or 'PF Provisioned' are included;
+-- 'No PF Provision' rows are excluded from the output.
 --
 -- Output → dev_dm.revops_analytics.pf_oli_classification
 -- =============================================================================
 
-CREATE OR REPLACE TABLE dev_dm.revops_analytics.pf_oli_classification AS
+CREATE OR REPLACE TABLE dev_dm.revops_analytics.pf_oli_classification
+ AS
 
 WITH
 
@@ -34,13 +34,14 @@ row_scoring AS (
     close_date,
     match_type,
     sn_pathfinder_enabled,
+    sn_used_for,
     sn_install_status,
     reversal_opp,
     decom_resource,
 
     -- PF Provisioned: active PF-enabled provision OR explicit deployment-linked match
     CASE
-      WHEN (sn_pathfinder_enabled = TRUE AND sn_install_status = '1')
+      WHEN (sn_pathfinder_enabled = TRUE AND sn_install_status = '1' AND sn_used_for IN ('Staging', 'Production'))
         OR match_type LIKE '%deployment%'
       THEN oli_id
       ELSE NULL
@@ -52,7 +53,9 @@ row_scoring AS (
       THEN 1 ELSE 0
     END AS is_decom_rr
 
-  FROM dev_dm.revops_analytics.provisions_temp
+  FROM dev_dm.revops_analytics.provisions_temp_4726
+  WHERE opp_type != 'Renewal'
+    AND (quantity > 0.1 OR quantity < 0.1)
 ),
 
 -- ── Step 2: Apply overrides ───────────────────────────────────────────────────
@@ -102,13 +105,11 @@ categorized AS (
 
 -- ── Final output: one row per OLI ────────────────────────────────────────────
 SELECT
-  oli_id,
-  pf_provisioned_override,
-  oli_output,
-  -- 1 when OLI is confirmed PF Provisioned or Decom/RR, 0 otherwise
-  CASE
-    WHEN oli_output IN ('Decom/RR', 'PF Provisioned') THEN 1
-    ELSE 0
-  END AS is_pf_or_decom
+  oli_id                                      AS OLI_ID,
+  CASE WHEN oli_output = 'Decom/RR'
+       THEN 1 END                             AS Decom_RR,
+  CASE WHEN oli_output = 'PF Provisioned'
+       THEN 1 END                             AS PF_Provisioned
 FROM categorized
+WHERE oli_output IN ('Decom/RR', 'PF Provisioned')
 ORDER BY oli_id;
