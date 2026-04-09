@@ -15,8 +15,9 @@
 --
 -- Source tables:
 --   dev_dm.revops_analytics.arr_by_product_w_oli8s  (ARR by quarter)
---   dev_dm.revops_analytics.provisions_temp         (OLI → provision matches)
+--   dev_dm.revops_analytics.provisions_temp_4726     (OLI → provision matches)
 --   dev_dm.revops_analytics.pf_oli_classification   (OLI provisioning class)
+--                columns: OLI_ID, Decom_RR (1/null), PF_Provisioned (1/null)
 -- =============================================================================
 
 WITH
@@ -46,23 +47,22 @@ provisioned_accounts AS (
     pt.account_id,
     COALESCE(lk.pf_short, pt.product_family) AS product_family,
     ARRAY_JOIN(ARRAY_SORT(COLLECT_SET(
-      CASE WHEN cl.oli_output = 'Decom/RR'
+      CASE WHEN cl.Decom_RR = 1
            THEN pt.oli_id END
     )), ', ')                                 AS decom_rr_olis,
     ARRAY_JOIN(ARRAY_SORT(COLLECT_SET(
-      CASE WHEN cl.oli_output = 'PF Provisioned'
+      CASE WHEN cl.PF_Provisioned = 1
            THEN pt.oli_id END
     )), ', ')                                 AS provision_pf_olis,
     ARRAY_JOIN(ARRAY_SORT(COLLECT_SET(
       CAST(pt.close_date AS STRING)
     )), ', ')                                 AS close_dates
-  FROM dev_dm.revops_analytics.provisions_temp            pt
+  FROM dev_dm.revops_analytics.provisions_temp_4726       pt
   INNER JOIN dev_dm.revops_analytics.pf_oli_classification cl
-    ON cl.oli_id = pt.oli_id
+    ON cl.OLI_ID = pt.oli_id
   LEFT JOIN pf_family_lookup lk
     ON lk.product_family = pt.product_family
   WHERE pt.opp_type != 'Renewal'
-    AND cl.oli_output IN ('PF Provisioned', 'Decom/RR')
   GROUP BY pt.account_id,
            COALESCE(lk.pf_short, pt.product_family)
 ),
