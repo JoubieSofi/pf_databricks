@@ -71,7 +71,7 @@ provisioned_accounts AS (
 arr_base AS (
   SELECT
     `Account Name`,
-    regexp_extract(`Account Link`, '[^/]+$')  AS account_id,
+    regexp_extract(`Account Link`, '([^/]+)$', 1) AS account_id,
     `Opportunity ID`,
     `Opportunity Product ID`,
     `Product Family Short`                    AS product_family,
